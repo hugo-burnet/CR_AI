@@ -369,20 +369,32 @@ def generate():
             except json.JSONDecodeError:
                 continue
 
-        cr_text = "".join(cr_parts)
-        os.makedirs(OUTPUT_DIR, exist_ok=True)
-        stamp    = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
-        filepath = os.path.join(OUTPUT_DIR, f"CR_{stamp}.md")
-
-        with open(filepath, "w", encoding="utf-8") as fh:
-            fh.write(cr_text)
-            fh.write("\n\n---\n\n## Transcription brute\n\n")
-            fh.write(transcription)
-
-        yield sse({"type": "done", "file": filepath})
+        yield sse({"type": "done", "transcription": transcription})
 
     return Response(stream_with_context(stream()), mimetype="text/event-stream",
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/save", methods=["POST"])
+def save():
+    data          = request.json or {}
+    content       = data.get("content", "").strip()
+    transcription = data.get("transcription", "")
+
+    if not content:
+        return jsonify({"error": "Contenu vide"}), 400
+
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    stamp    = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")
+    filepath = os.path.join(OUTPUT_DIR, f"CR_{stamp}.md")
+
+    with open(filepath, "w", encoding="utf-8") as fh:
+        fh.write(content)
+        if transcription:
+            fh.write("\n\n---\n\n## Transcription brute\n\n")
+            fh.write(transcription)
+
+    return jsonify({"status": "saved", "file": filepath})
 
 
 # ── Lancement ──────────────────────────────────────────────────────────────────

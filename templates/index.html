@@ -270,14 +270,42 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
         </svg>
         <h2 class="text-sm font-semibold text-slate-700">Compte-rendu</h2>
+        <span id="editBadge" class="hidden text-xs text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">Modifiable</span>
       </div>
       <div class="flex items-center gap-1">
         <button onclick="copyToClipboard()" class="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1 hover:bg-slate-100 rounded-md cursor-pointer transition-colors">Copier</button>
         <button id="rawToggle" onclick="toggleView()" class="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1 hover:bg-slate-100 rounded-md cursor-pointer transition-colors">Rendu</button>
       </div>
     </div>
+    <!-- Streaming (lecture seule) -->
     <pre id="rawOutput" class="px-5 py-4 text-xs font-mono text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[420px] overflow-y-auto bg-slate-50 m-0"></pre>
+    <!-- Édition (après génération) -->
+    <textarea id="editableOutput" oninput="onEdit()"
+      class="hidden w-full px-5 py-4 text-xs font-mono text-slate-700 leading-relaxed bg-white resize-none focus:outline-none border-0 max-h-[420px] overflow-y-auto"
+      style="min-height:200px"></textarea>
+    <!-- Rendu markdown -->
     <div id="renderedOutput" class="hidden px-5 py-4 text-sm leading-relaxed max-h-[420px] overflow-y-auto md"></div>
+    <!-- Barre d'action sauvegarde -->
+    <div id="saveBar" class="hidden px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-2 text-xs text-slate-400">
+        <span id="charCount">0 car.</span>
+        <span id="modifiedDot" class="hidden w-1.5 h-1.5 rounded-full bg-orange-400"></span>
+        <span id="modifiedLabel" class="hidden text-orange-500">Modifié</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="resetEdits()" id="resetBtn"
+          class="hidden text-xs text-slate-500 hover:text-slate-700 px-3 py-1.5 border border-slate-200 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors">
+          Annuler les modifications
+        </button>
+        <button onclick="saveDocument()" id="saveDocBtn"
+          class="text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 px-4 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
+          </svg>
+          Sauvegarder
+        </button>
+      </div>
+    </div>
   </section>
 
   <!-- Save notification -->
@@ -310,7 +338,8 @@
 // ── State ────────────────────────────────────────────────────────────────────
 let isRecording = false, audioReady = false;
 let recordSecs = 0, timerInterval = null;
-let rawText = "", showingRaw = true;
+let rawText = "", originalText = "", capturedTranscription = "";
+let showingRaw = true, generationDone = false;
 let activeESS = null, savedFilePath = "";
 let setupOpen = false;
 
@@ -545,11 +574,16 @@ async function generate() {
 
   hideError();
   document.getElementById("saveNotif").classList.add("hidden");
-  rawText = "";
+  rawText = ""; originalText = ""; capturedTranscription = ""; generationDone = false;
   document.getElementById("rawOutput").textContent = "";
+  document.getElementById("editableOutput").value = "";
   document.getElementById("renderedOutput").innerHTML = "";
-  document.getElementById("renderedOutput").classList.add("hidden");
   document.getElementById("rawOutput").classList.remove("hidden");
+  document.getElementById("editableOutput").classList.add("hidden");
+  document.getElementById("renderedOutput").classList.add("hidden");
+  document.getElementById("saveBar").classList.add("hidden");
+  document.getElementById("editBadge").classList.add("hidden");
+  document.getElementById("saveNotif").classList.add("hidden");
   showingRaw = true;
   document.getElementById("rawToggle").textContent = "Rendu";
   document.getElementById("outputCard").classList.remove("hidden");
@@ -570,6 +604,9 @@ async function generate() {
       else if (d.step === 2) { setStep(1,"done",d.message); }
       else if (d.step === 3) { setStep(1,"done"); setStep(2,"active",d.message); }
     }
+    if (d.type === "transcription") {
+      capturedTranscription = d.text;
+    }
     if (d.type === "token") {
       rawText += d.text;
       const el = document.getElementById("rawOutput");
@@ -577,12 +614,22 @@ async function generate() {
     }
     if (d.type === "done") {
       activeESS.close(); activeESS = null;
-      savedFilePath = d.file;
+      generationDone = true;
+      originalText = rawText;
+      // Basculer vers la textarea éditable
+      document.getElementById("rawOutput").classList.add("hidden");
+      const ta = document.getElementById("editableOutput");
+      ta.value = rawText;
+      ta.classList.remove("hidden");
+      ta.style.height = Math.min(ta.scrollHeight, 420) + "px";
+      // Préparer le rendu markdown
       document.getElementById("renderedOutput").innerHTML = marked.parse(rawText);
-      document.getElementById("saveFilePath").textContent = d.file;
-      document.getElementById("saveNotif").classList.remove("hidden");
-      document.getElementById("saveNotif").scrollIntoView({ behavior:"smooth", block:"nearest" });
-      setStep(1,"done"); setStep(2,"done"); setStep(3,"done","Sauvegardé");
+      // Afficher la barre de sauvegarde
+      document.getElementById("saveBar").classList.remove("hidden");
+      document.getElementById("editBadge").classList.remove("hidden");
+      document.getElementById("charCount").textContent = rawText.length + " car.";
+      setStep(1,"done"); setStep(2,"done");
+      setStep(3,"active","En attente de sauvegarde");
       btn.disabled = false;
       btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Nouveau compte-rendu`;
     }
@@ -597,17 +644,75 @@ async function generate() {
   setTimeout(() => document.getElementById("outputCard").scrollIntoView({ behavior:"smooth", block:"nearest" }), 100);
 }
 
+// ── Édition ───────────────────────────────────────────────────────────────────
+function onEdit() {
+  const ta = document.getElementById("editableOutput");
+  const modified = ta.value !== originalText;
+  document.getElementById("charCount").textContent = ta.value.length + " car.";
+  document.getElementById("modifiedDot").classList.toggle("hidden", !modified);
+  document.getElementById("modifiedLabel").classList.toggle("hidden", !modified);
+  document.getElementById("resetBtn").classList.toggle("hidden", !modified);
+  // Mettre à jour le rendu markdown en temps réel
+  document.getElementById("renderedOutput").innerHTML = marked.parse(ta.value);
+}
+
+function resetEdits() {
+  const ta = document.getElementById("editableOutput");
+  ta.value = originalText;
+  document.getElementById("renderedOutput").innerHTML = marked.parse(originalText);
+  document.getElementById("charCount").textContent = originalText.length + " car.";
+  document.getElementById("modifiedDot").classList.add("hidden");
+  document.getElementById("modifiedLabel").classList.add("hidden");
+  document.getElementById("resetBtn").classList.add("hidden");
+}
+
+async function saveDocument() {
+  const ta      = document.getElementById("editableOutput");
+  const content = generationDone ? ta.value : rawText;
+  const btn     = document.getElementById("saveDocBtn");
+
+  btn.disabled = true;
+  btn.innerHTML = spinSVG() + "Sauvegarde…";
+
+  const r = await fetch("/save", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content, transcription: capturedTranscription }),
+  });
+  const d = await r.json();
+
+  btn.disabled = false;
+  btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>Sauvegarder`;
+
+  if (!r.ok) { showError(d.error); return; }
+
+  savedFilePath = d.file;
+  originalText  = content; // Réinitialise l'état "modifié"
+  document.getElementById("modifiedDot").classList.add("hidden");
+  document.getElementById("modifiedLabel").classList.add("hidden");
+  document.getElementById("resetBtn").classList.add("hidden");
+  document.getElementById("saveFilePath").textContent = d.file;
+  document.getElementById("saveNotif").classList.remove("hidden");
+  document.getElementById("saveNotif").scrollIntoView({ behavior:"smooth", block:"nearest" });
+  setStep(3, "done", "Sauvegardé");
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 async function copyToClipboard() {
-  try { await navigator.clipboard.writeText(rawText); }
-  catch { const el=document.createElement("textarea"); el.value=rawText; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }
+  const text = generationDone ? document.getElementById("editableOutput").value : rawText;
+  try { await navigator.clipboard.writeText(text); }
+  catch { const el=document.createElement("textarea"); el.value=text; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }
 }
 
 function toggleView() {
   showingRaw = !showingRaw;
-  document.getElementById("rawOutput").classList.toggle("hidden", !showingRaw);
+  if (generationDone) {
+    document.getElementById("editableOutput").classList.toggle("hidden", !showingRaw);
+  } else {
+    document.getElementById("rawOutput").classList.toggle("hidden", !showingRaw);
+  }
   document.getElementById("renderedOutput").classList.toggle("hidden", showingRaw);
-  document.getElementById("rawToggle").textContent = showingRaw ? "Rendu" : "Brut";
+  document.getElementById("rawToggle").textContent = showingRaw ? "Rendu" : "Édition";
 }
 
 async function openSavedFile() {
