@@ -9,7 +9,7 @@ echo   CR Chantier - Build automatique
 echo  =========================================
 echo.
 
-:: ── Elevation admin (necessaire pour installer Python) ────────────────────
+REM ---- Elevation admin ----
 net session >nul 2>&1
 if errorlevel 1 (
     echo  Demande des droits administrateur...
@@ -17,83 +17,55 @@ if errorlevel 1 (
     exit /b
 )
 
-:: ── 1. Trouver ou installer Python ────────────────────────────────────────
+REM ---- 1. Trouver Python (hors Microsoft Store) ----
 echo [1/4] Verification de Python...
 
 set PYTHON_EXE=
 
-:: Chercher Python dans les emplacements standards (hors Microsoft Store)
-for %%P in (
-    "C:\Program Files\Python311\python.exe"
-    "C:\Program Files\Python312\python.exe"
-    "C:\Program Files\Python310\python.exe"
-    "C:\Python311\python.exe"
-    "C:\Python312\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-) do (
-    if exist %%P (
-        set PYTHON_EXE=%%~P
-        goto :python_ok
-    )
+if exist "C:\Program Files\Python311\python.exe" set PYTHON_EXE=C:\Program Files\Python311\python.exe
+if exist "C:\Program Files\Python312\python.exe" set PYTHON_EXE=C:\Program Files\Python312\python.exe
+if exist "C:\Program Files\Python313\python.exe" set PYTHON_EXE=C:\Program Files\Python313\python.exe
+if exist "C:\Python311\python.exe" set PYTHON_EXE=C:\Python311\python.exe
+if exist "C:\Python312\python.exe" set PYTHON_EXE=C:\Python312\python.exe
+
+if not "!PYTHON_EXE!"=="" goto :python_ok
+
+REM ---- Python absent : installer via winget ----
+echo      Python non detecte. Installation...
+winget install Python.Python.3.11 --source winget --scope machine --silent --accept-package-agreements --accept-source-agreements
+timeout /t 8 /nobreak >nul
+
+if exist "C:\Program Files\Python311\python.exe" (
+    set PYTHON_EXE=C:\Program Files\Python311\python.exe
+    goto :python_ok
 )
 
-:: Verifier si python en PATH (et pas le stub Microsoft Store)
-where python >nul 2>&1
-if not errorlevel 1 (
-    for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)" 2^>nul') do set _PY=%%i
-    echo !_PY! | findstr /i "WindowsApps" >nul
-    if errorlevel 1 (
-        set PYTHON_EXE=!_PY!
-        goto :python_ok
-    )
-)
-
-:: Python absent ou uniquement version Microsoft Store → installer
-echo      Python non detecte. Installation via winget...
-winget install Python.Python.3.11 --source winget --scope machine --silent --accept-package-agreements --accept-source-agreements >nul 2>&1
-
-:: Attendre que l'installation se termine
-timeout /t 5 /nobreak >nul
-
-:: Re-chercher apres installation
-for %%P in (
-    "C:\Program Files\Python311\python.exe"
-    "C:\Python311\python.exe"
-    "%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-) do (
-    if exist %%P (
-        set PYTHON_EXE=%%~P
-        goto :python_ok
-    )
-)
-
-:: Dernier recours : telechargement direct depuis python.org
+REM ---- Fallback : telechargement direct python.org ----
 echo      Telechargement de Python 3.11 depuis python.org...
 powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile '%TEMP%\python311_setup.exe' -UseBasicParsing"
 if errorlevel 1 (
-    echo [ERREUR] Impossible de telecharger Python. Verifiez votre connexion internet.
+    echo [ERREUR] Telechargement impossible. Verifiez votre connexion.
     pause & exit /b 1
 )
-echo      Installation de Python 3.11...
+echo      Installation en cours...
 "%TEMP%\python311_setup.exe" /quiet InstallAllUsers=1 PrependPath=1 TargetDir=C:\Python311
 timeout /t 10 /nobreak >nul
 set PYTHON_EXE=C:\Python311\python.exe
 
 :python_ok
 if not exist "%PYTHON_EXE%" (
-    echo [ERREUR] Python introuvable apres installation. Relancez le script.
+    echo [ERREUR] Python introuvable. Relancez le script.
     pause & exit /b 1
 )
 echo      OK : %PYTHON_EXE%
 "%PYTHON_EXE%" --version
 
-:: ── 2. pip ────────────────────────────────────────────────────────────────
+REM ---- 2. Mise a jour pip ----
 echo [2/4] Mise a jour de pip...
 "%PYTHON_EXE%" -m pip install --upgrade pip --quiet
 
-:: ── 3. Dependances ────────────────────────────────────────────────────────
-echo [3/4] Installation des dependances (peut prendre quelques minutes)...
+REM ---- 3. Dependances ----
+echo [3/4] Installation des dependances...
 "%PYTHON_EXE%" -m pip install flask faster-whisper sounddevice soundfile numpy requests pyinstaller --quiet
 if errorlevel 1 (
     echo [ERREUR] Echec installation des dependances.
@@ -101,7 +73,7 @@ if errorlevel 1 (
 )
 echo      OK
 
-:: ── 4. Build PyInstaller ──────────────────────────────────────────────────
+REM ---- 4. Build ----
 echo [4/4] Construction de l'executable...
 echo.
 "%PYTHON_EXE%" -m PyInstaller cr_chantier.spec --clean --noconfirm
@@ -113,12 +85,11 @@ if errorlevel 1 (
 
 echo.
 echo  =========================================
-echo   Build termine avec succes !
-echo.
+echo   Build termine !
 echo   Executable : dist\CR_Chantier\CR_Chantier.exe
 echo.
-echo   Pour distribuer l'application, copiez
-echo   le dossier dist\CR_Chantier\ en entier.
+echo   Pour distribuer : copier le dossier
+echo   dist\CR_Chantier\ en entier.
 echo  =========================================
 echo.
 pause
