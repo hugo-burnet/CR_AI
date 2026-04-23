@@ -1,0 +1,9 @@
+dist/
+build/
+__pycache__/
+*.pyc
+*.pyo
+*.spec.bak
+*.wav
+*.mp3
+*.m4a

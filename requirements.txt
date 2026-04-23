@@ -1,0 +1,7 @@
+flask
+faster-whisper
+sounddevice
+soundfile
+numpy
+requests
+pyinstaller

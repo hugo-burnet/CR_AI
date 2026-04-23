@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CR Chantier</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ["Fira Sans","sans-serif"], mono: ["Fira Code","monospace"] } } }
+    }
+  </script>
+  <style>
+    body { font-family:"Fira Sans",sans-serif; }
+    @keyframes pulse-ring { 0%{transform:scale(.85);opacity:.7} 100%{transform:scale(1.7);opacity:0} }
+    .pulse-ring         { animation:pulse-ring 1.6s ease-out infinite; }
+    .pulse-ring-delayed { animation:pulse-ring 1.6s ease-out .55s infinite; }
+    .md h1  { font-size:1.15rem;font-weight:700;color:#1e293b;margin-bottom:.6rem }
+    .md h2  { font-size:.95rem;font-weight:600;color:#334155;border-bottom:1px solid #e2e8f0;padding-bottom:.2rem;margin:1rem 0 .4rem }
+    .md h3  { font-size:.875rem;font-weight:600;color:#475569;margin:.7rem 0 .25rem }
+    .md p   { color:#475569;margin-bottom:.4rem }
+    .md ul  { margin-left:1.25rem;list-style:disc;margin-bottom:.5rem }
+    .md li  { color:#475569;margin-bottom:.15rem }
+    .md table { width:100%;border-collapse:collapse;font-size:.8rem;margin-bottom:.75rem }
+    .md th  { background:#f1f5f9;padding:.3rem .65rem;text-align:left;font-weight:600;color:#334155;border:1px solid #e2e8f0 }
+    .md td  { padding:.3rem .65rem;color:#475569;border:1px solid #e2e8f0 }
+    .md blockquote { border-left:3px solid #e2e8f0;padding-left:.75rem;color:#94a3b8;font-style:italic;margin:.5rem 0;font-size:.85rem }
+    .md code { font-family:"Fira Code",monospace;background:#f1f5f9;padding:.1rem .25rem;border-radius:.2rem;font-size:.82em }
+    .md hr  { border:0;border-top:1px solid #e2e8f0;margin:.9rem 0 }
+    ::-webkit-scrollbar { width:5px }
+    ::-webkit-scrollbar-track { background:transparent }
+    ::-webkit-scrollbar-thumb { background:#cbd5e1;border-radius:3px }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+
+<!-- ── Header ─────────────────────────────────────────────────────────────────── -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+  <div class="max-w-3xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center shadow-sm">
+        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="font-bold text-slate-800 text-sm leading-none">CR Chantier</h1>
+        <p class="text-xs text-slate-400 leading-none mt-0.5">Whisper + Ollama · 100% local</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Setup button -->
+      <button onclick="toggleSetup()" id="setupBtn"
+        class="hidden items-center gap-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+        </svg>
+        Configuration requise
+      </button>
+      <!-- Ollama status -->
+      <div class="flex items-center gap-1.5 text-xs text-slate-400">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-300 transition-colors"></span>
+        <span id="statusText">Vérification…</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── Setup panel ────────────────────────────────────────────────────────────── -->
+<div id="setupPanel" class="hidden bg-amber-50 border-b border-amber-200">
+  <div class="max-w-3xl mx-auto px-6 py-5">
+    <div class="flex items-start justify-between mb-4">
+      <div>
+        <h2 class="font-semibold text-amber-900 text-sm">Configuration de l'IA</h2>
+        <p class="text-xs text-amber-700 mt-0.5">Installez les composants manquants avant de démarrer.</p>
+      </div>
+      <button onclick="toggleSetup()" class="text-amber-500 hover:text-amber-700 cursor-pointer p-1">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="space-y-3">
+
+      <!-- Ollama -->
+      <div class="bg-white rounded-xl border border-amber-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span id="s-ollama-icon" class="w-5 h-5 flex items-center justify-center shrink-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            </span>
+            <div>
+              <p class="text-sm font-medium text-slate-700">Ollama</p>
+              <p id="s-ollama-desc" class="text-xs text-slate-400">Service IA local</p>
+            </div>
+          </div>
+          <button id="s-ollama-btn" onclick="installOllama()" class="hidden text-xs font-medium text-white bg-slate-700 hover:bg-slate-800 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
+            Télécharger
+          </button>
+        </div>
+      </div>
+
+      <!-- Modèle LLM -->
+      <div class="bg-white rounded-xl border border-amber-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span id="s-model-icon" class="w-5 h-5 flex items-center justify-center shrink-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            </span>
+            <div>
+              <p class="text-sm font-medium text-slate-700">Modèle LLM <span class="font-mono text-xs text-slate-400">gemma4:e4b</span></p>
+              <p id="s-model-desc" class="text-xs text-slate-400">Modèle de rédaction (~9 Go)</p>
+            </div>
+          </div>
+          <button id="s-model-btn" onclick="installModel()" class="hidden text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
+            Télécharger
+          </button>
+        </div>
+        <div id="s-model-log" class="hidden mt-2 font-mono text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 max-h-24 overflow-y-auto"></div>
+      </div>
+
+      <!-- Whisper -->
+      <div class="bg-white rounded-xl border border-amber-200 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <span id="s-whisper-icon" class="w-5 h-5 flex items-center justify-center shrink-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>
+            </span>
+            <div>
+              <p class="text-sm font-medium text-slate-700">Modèle Whisper <span class="font-mono text-xs text-slate-400">medium</span></p>
+              <p id="s-whisper-desc" class="text-xs text-slate-400">Transcription vocale (~1.5 Go)</p>
+            </div>
+          </div>
+          <button id="s-whisper-btn" onclick="installWhisper()" class="hidden text-xs font-medium text-white bg-orange-500 hover:bg-orange-600 px-3 py-1.5 rounded-lg cursor-pointer transition-colors">
+            Télécharger
+          </button>
+        </div>
+        <div id="s-whisper-log" class="hidden mt-2 font-mono text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 max-h-16 overflow-y-auto"></div>
+      </div>
+
+    </div>
+
+    <button onclick="refreshSetup()" class="mt-3 text-xs text-amber-700 hover:text-amber-900 underline cursor-pointer">
+      Actualiser le statut
+    </button>
+  </div>
+</div>
+
+<!-- ── Main ───────────────────────────────────────────────────────────────────── -->
+<main class="max-w-3xl mx-auto px-6 py-7 space-y-5">
+
+  <!-- 1. Projet -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2.5">
+      <span class="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center">1</span>
+      <h2 class="text-sm font-semibold text-slate-700">Informations du projet</h2>
+    </div>
+    <div class="px-5 py-4 space-y-3">
+      <div>
+        <label for="nom_projet" class="block text-xs font-medium text-slate-500 mb-1">Nom du projet</label>
+        <input id="nom_projet" type="text" placeholder="Ex : Résidence Les Pins — Lot 4 Plomberie"
+          class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all">
+      </div>
+      <div>
+        <label for="contexte" class="block text-xs font-medium text-slate-500 mb-1">
+          Contexte <span class="text-slate-400 font-normal">(optionnel)</span>
+        </label>
+        <input id="contexte" type="text" placeholder="Ex : Réunion hebdo, problème étanchéité toiture"
+          class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition-all">
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Audio -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2.5">
+      <span class="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center">2</span>
+      <h2 class="text-sm font-semibold text-slate-700">Source audio</h2>
+    </div>
+    <div class="px-5 py-4">
+      <div class="flex gap-2 mb-5 p-1 bg-slate-100 rounded-lg">
+        <button id="tabRecord" onclick="switchTab('record')"
+          class="flex-1 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-slate-800 transition-all cursor-pointer">Microphone</button>
+        <button id="tabImport" onclick="switchTab('import')"
+          class="flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all cursor-pointer">Importer un fichier</button>
+      </div>
+
+      <!-- Record -->
+      <div id="panelRecord" class="flex flex-col items-center gap-4">
+        <div class="relative flex items-center justify-center w-24 h-24">
+          <div id="pr1" class="absolute inset-0 rounded-full bg-red-400 opacity-0"></div>
+          <div id="pr2" class="absolute inset-0 rounded-full bg-red-400 opacity-0"></div>
+          <button id="recordBtn" onclick="toggleRecording()"
+            class="relative z-10 w-20 h-20 rounded-full bg-slate-800 hover:bg-orange-500 text-white flex items-center justify-center shadow-lg transition-colors duration-200 cursor-pointer">
+            <svg id="recordIcon" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>
+            </svg>
+          </button>
+        </div>
+        <div class="text-center">
+          <p id="recordLabel" class="text-sm text-slate-500">Cliquer pour démarrer</p>
+          <p id="recordTimer" class="text-xs font-mono text-slate-400 mt-0.5 hidden">0:00</p>
+        </div>
+      </div>
+
+      <!-- Import -->
+      <div id="panelImport" class="hidden">
+        <label for="audioFile"
+          class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl py-9 px-4 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition-all">
+          <svg class="w-8 h-8 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/>
+          </svg>
+          <span class="text-sm text-slate-500">Glisser un fichier ou cliquer</span>
+          <span class="text-xs text-slate-400">.wav · .mp3 · .m4a · .ogg · .flac</span>
+          <input id="audioFile" type="file" accept=".wav,.mp3,.m4a,.ogg,.flac" class="hidden" onchange="handleFileUpload(this)">
+        </label>
+      </div>
+
+      <!-- Audio ready -->
+      <div id="audioReadyBadge" class="hidden mt-4 flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 px-4 py-2.5 rounded-lg">
+        <svg class="w-4 h-4 shrink-0 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+        </svg>
+        <span id="audioReadyText">Audio prêt</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Génération -->
+  <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-slate-100 flex items-center gap-2.5">
+      <span class="w-5 h-5 rounded-full bg-orange-100 text-orange-600 text-xs font-bold flex items-center justify-center">3</span>
+      <h2 class="text-sm font-semibold text-slate-700">Génération</h2>
+    </div>
+    <div class="px-5 py-4 space-y-4">
+      <button id="generateBtn" onclick="generate()"
+        class="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white font-semibold text-sm rounded-lg transition-colors duration-200 cursor-pointer flex items-center justify-center gap-2">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+        </svg>
+        Générer le compte-rendu
+      </button>
+      <div id="progressSection" class="hidden space-y-1.5 pt-1">
+        <div class="flex items-center gap-3 text-sm">
+          <span id="s1icon" class="w-5 h-5 flex items-center justify-center shrink-0"><span class="w-2 h-2 rounded-full bg-slate-300"></span></span>
+          <span id="s1text" class="text-slate-400">Transcription vocale</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <span id="s2icon" class="w-5 h-5 flex items-center justify-center shrink-0"><span class="w-2 h-2 rounded-full bg-slate-300"></span></span>
+          <span id="s2text" class="text-slate-400">Rédaction du compte-rendu</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <span id="s3icon" class="w-5 h-5 flex items-center justify-center shrink-0"><span class="w-2 h-2 rounded-full bg-slate-300"></span></span>
+          <span id="s3text" class="text-slate-400">Sauvegarde</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Output -->
+  <section id="outputCard" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+        </svg>
+        <h2 class="text-sm font-semibold text-slate-700">Compte-rendu</h2>
+      </div>
+      <div class="flex items-center gap-1">
+        <button onclick="copyToClipboard()" class="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1 hover:bg-slate-100 rounded-md cursor-pointer transition-colors">Copier</button>
+        <button id="rawToggle" onclick="toggleView()" class="text-xs text-slate-500 hover:text-slate-700 px-2.5 py-1 hover:bg-slate-100 rounded-md cursor-pointer transition-colors">Rendu</button>
+      </div>
+    </div>
+    <pre id="rawOutput" class="px-5 py-4 text-xs font-mono text-slate-600 leading-relaxed whitespace-pre-wrap max-h-[420px] overflow-y-auto bg-slate-50 m-0"></pre>
+    <div id="renderedOutput" class="hidden px-5 py-4 text-sm leading-relaxed max-h-[420px] overflow-y-auto md"></div>
+  </section>
+
+  <!-- Save notification -->
+  <div id="saveNotif" class="hidden bg-green-50 border border-green-200 rounded-xl px-5 py-4 flex items-start gap-3">
+    <svg class="w-5 h-5 text-green-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+    </svg>
+    <div class="flex-1 min-w-0">
+      <p class="text-sm font-semibold text-green-800">Compte-rendu sauvegardé</p>
+      <p id="saveFilePath" class="text-xs text-green-600 font-mono mt-0.5 break-all"></p>
+    </div>
+    <button onclick="openSavedFile()" class="shrink-0 text-xs font-medium text-green-700 hover:text-green-900 px-2.5 py-1 border border-green-300 hover:bg-green-100 rounded-md cursor-pointer transition-colors">Ouvrir</button>
+  </div>
+
+  <!-- Error -->
+  <div id="errorNotif" class="hidden bg-red-50 border border-red-200 rounded-xl px-5 py-4 flex items-start gap-3">
+    <svg class="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    <div>
+      <p class="text-sm font-semibold text-red-800">Erreur</p>
+      <p id="errorMessage" class="text-xs text-red-600 mt-0.5"></p>
+    </div>
+  </div>
+
+  <div class="pb-8"></div>
+</main>
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let isRecording = false, audioReady = false;
+let recordSecs = 0, timerInterval = null;
+let rawText = "", showingRaw = true;
+let activeESS = null, savedFilePath = "";
+let setupOpen = false;
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+const ICONS = {
+  pending: `<span class="w-2.5 h-2.5 rounded-full bg-slate-300"></span>`,
+  ok:      `<svg class="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`,
+  warn:    `<svg class="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>`,
+  spin:    `<svg class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`,
+};
+
+async function refreshSetup() {
+  const r = await fetch("/api/status");
+  const d = await r.json();
+
+  // Ollama service
+  if (d.ollama_running) {
+    document.getElementById("s-ollama-icon").innerHTML = ICONS.ok;
+    document.getElementById("s-ollama-desc").textContent = "En cours d'exécution";
+    document.getElementById("s-ollama-btn").classList.add("hidden");
+    dot("bg-green-400"); txt("Ollama actif");
+  } else {
+    document.getElementById("s-ollama-icon").innerHTML = ICONS.warn;
+    document.getElementById("s-ollama-desc").textContent = "Non détecté — à installer";
+    document.getElementById("s-ollama-btn").classList.remove("hidden");
+    dot("bg-red-400"); txt("Ollama hors ligne");
+  }
+
+  // Model
+  if (d.model_available) {
+    document.getElementById("s-model-icon").innerHTML = ICONS.ok;
+    document.getElementById("s-model-desc").textContent = "Modèle prêt";
+    document.getElementById("s-model-btn").classList.add("hidden");
+  } else if (d.ollama_running) {
+    document.getElementById("s-model-icon").innerHTML = ICONS.warn;
+    document.getElementById("s-model-desc").textContent = "Non téléchargé (~9 Go)";
+    document.getElementById("s-model-btn").classList.remove("hidden");
+  } else {
+    document.getElementById("s-model-icon").innerHTML = ICONS.pending;
+    document.getElementById("s-model-desc").textContent = "En attente d'Ollama";
+    document.getElementById("s-model-btn").classList.add("hidden");
+  }
+
+  // Whisper
+  if (d.whisper_cached) {
+    document.getElementById("s-whisper-icon").innerHTML = ICONS.ok;
+    document.getElementById("s-whisper-desc").textContent = "Modèle en cache";
+    document.getElementById("s-whisper-btn").classList.add("hidden");
+  } else {
+    document.getElementById("s-whisper-icon").innerHTML = ICONS.warn;
+    document.getElementById("s-whisper-desc").textContent = "Non téléchargé (~1.5 Go) — se télécharge au premier usage";
+    document.getElementById("s-whisper-btn").classList.remove("hidden");
+  }
+
+  // Show/hide setup button in header
+  const needsSetup = !d.ollama_running || !d.model_available || !d.whisper_cached;
+  document.getElementById("setupBtn").classList.toggle("hidden", !needsSetup);
+  document.getElementById("setupBtn").classList.toggle("flex", needsSetup);
+
+  return d;
+}
+
+function toggleSetup() {
+  setupOpen = !setupOpen;
+  document.getElementById("setupPanel").classList.toggle("hidden", !setupOpen);
+  if (setupOpen) refreshSetup();
+}
+
+function installOllama() {
+  fetch("/api/open-ollama-download");
+}
+
+function installModel() {
+  const btn = document.getElementById("s-model-btn");
+  const log = document.getElementById("s-model-log");
+  btn.disabled = true; btn.textContent = "En cours…";
+  log.classList.remove("hidden"); log.textContent = "";
+
+  const ess = new EventSource("/api/install-model");
+  document.getElementById("s-model-icon").innerHTML = ICONS.spin;
+
+  ess.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.text) { log.textContent += d.text + "\n"; log.scrollTop = log.scrollHeight; }
+    if (d.done) {
+      ess.close();
+      document.getElementById("s-model-icon").innerHTML = ICONS.ok;
+      document.getElementById("s-model-desc").textContent = "Modèle prêt";
+      btn.classList.add("hidden");
+      refreshSetup();
+    }
+    if (d.error) {
+      ess.close();
+      document.getElementById("s-model-icon").innerHTML = ICONS.warn;
+      log.textContent += "Erreur : " + d.error;
+      btn.disabled = false; btn.textContent = "Réessayer";
+    }
+  };
+}
+
+function installWhisper() {
+  const btn = document.getElementById("s-whisper-btn");
+  const log = document.getElementById("s-whisper-log");
+  btn.disabled = true; btn.textContent = "En cours…";
+  log.classList.remove("hidden"); log.textContent = "";
+
+  const ess = new EventSource("/api/download-whisper");
+  document.getElementById("s-whisper-icon").innerHTML = ICONS.spin;
+
+  ess.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.text) { log.textContent += d.text + "\n"; log.scrollTop = log.scrollHeight; }
+    if (d.done) {
+      ess.close();
+      document.getElementById("s-whisper-icon").innerHTML = ICONS.ok;
+      document.getElementById("s-whisper-desc").textContent = "Modèle en cache";
+      btn.classList.add("hidden");
+      refreshSetup();
+    }
+    if (d.error) {
+      ess.close();
+      document.getElementById("s-whisper-icon").innerHTML = ICONS.warn;
+      log.textContent += "Erreur : " + d.error;
+      btn.disabled = false; btn.textContent = "Réessayer";
+    }
+  };
+}
+
+// ── Ollama status ─────────────────────────────────────────────────────────────
+function dot(cls) { document.getElementById("statusDot").className = `w-2 h-2 rounded-full transition-colors ${cls}`; }
+function txt(t)   { document.getElementById("statusText").textContent = t; }
+refreshSetup();
+
+// ── Tab switch ────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  const act = "flex-1 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-slate-800 transition-all cursor-pointer";
+  const inact = "flex-1 py-1.5 text-sm font-medium rounded-md text-slate-500 hover:text-slate-700 transition-all cursor-pointer";
+  document.getElementById("tabRecord").className = tab === "record" ? act : inact;
+  document.getElementById("tabImport").className = tab === "import" ? act : inact;
+  document.getElementById("panelRecord").classList.toggle("hidden", tab !== "record");
+  document.getElementById("panelImport").classList.toggle("hidden", tab !== "import");
+  document.getElementById("audioReadyBadge").classList.add("hidden");
+  audioReady = false;
+}
+
+// ── Recording ─────────────────────────────────────────────────────────────────
+async function toggleRecording() { isRecording ? await stopRecording() : await startRecording(); }
+
+async function startRecording() {
+  const r = await fetch("/record/start", { method: "POST" });
+  const d = await r.json();
+  if (!r.ok) { showError(d.error); return; }
+  isRecording = true;
+
+  document.getElementById("recordBtn").className =
+    "relative z-10 w-20 h-20 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-colors duration-200 cursor-pointer";
+  document.getElementById("recordIcon").innerHTML =
+    `<rect x="7" y="7" width="10" height="10" rx="1" fill="currentColor"/>`;
+  document.getElementById("pr1").className = "absolute inset-0 rounded-full bg-red-400 pulse-ring";
+  document.getElementById("pr2").className = "absolute inset-0 rounded-full bg-red-400 pulse-ring-delayed opacity-0";
+  document.getElementById("recordLabel").textContent = "Enregistrement en cours…";
+  document.getElementById("recordLabel").className   = "text-sm text-red-500 font-medium";
+  document.getElementById("recordTimer").classList.remove("hidden");
+
+  recordSecs = 0;
+  timerInterval = setInterval(() => {
+    recordSecs++;
+    const m = Math.floor(recordSecs / 60), s = recordSecs % 60;
+    document.getElementById("recordTimer").textContent = `${m}:${String(s).padStart(2,"0")}`;
+  }, 1000);
+}
+
+async function stopRecording() {
+  const r = await fetch("/record/stop", { method: "POST" });
+  const d = await r.json();
+  if (!r.ok) { showError(d.error); return; }
+  isRecording = false;
+  clearInterval(timerInterval);
+
+  document.getElementById("recordBtn").className =
+    "relative z-10 w-20 h-20 rounded-full bg-slate-800 hover:bg-orange-500 text-white flex items-center justify-center shadow-lg transition-colors duration-200 cursor-pointer";
+  document.getElementById("recordIcon").innerHTML =
+    `<path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/>`;
+  document.getElementById("pr1").className = "absolute inset-0 rounded-full bg-red-400 opacity-0";
+  document.getElementById("pr2").className = "absolute inset-0 rounded-full bg-red-400 opacity-0";
+  document.getElementById("recordLabel").textContent = "Cliquer pour démarrer";
+  document.getElementById("recordLabel").className   = "text-sm text-slate-500";
+  document.getElementById("recordTimer").classList.add("hidden");
+
+  audioReady = true;
+  const dur = d.duration || recordSecs;
+  const m = Math.floor(dur / 60), s = Math.round(dur % 60);
+  showReadyBadge(`Audio enregistré — ${m}:${String(s).padStart(2,"0")}`);
+}
+
+async function handleFileUpload(input) {
+  if (!input.files.length) return;
+  const fd = new FormData();
+  fd.append("file", input.files[0]);
+  const r = await fetch("/upload", { method: "POST", body: fd });
+  const d = await r.json();
+  if (!r.ok) { showError(d.error); return; }
+  audioReady = true;
+  showReadyBadge(`Fichier chargé : ${d.filename}`);
+}
+
+function showReadyBadge(msg) {
+  document.getElementById("audioReadyText").textContent = msg;
+  document.getElementById("audioReadyBadge").classList.remove("hidden");
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+const STEP_ICONS = {
+  pending: `<span class="w-2 h-2 rounded-full bg-slate-300"></span>`,
+  active:  `<svg class="w-4 h-4 text-orange-500 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`,
+  done:    `<svg class="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`,
+};
+const TEXT_CLS = { pending:"text-slate-400", active:"text-orange-600 font-medium", done:"text-green-600" };
+
+function setStep(n, state, label) {
+  const ic = document.getElementById(`s${n}icon`);
+  const tx = document.getElementById(`s${n}text`);
+  if (ic) ic.innerHTML = STEP_ICONS[state];
+  if (tx) { tx.className = TEXT_CLS[state]; if (label) tx.textContent = label; }
+}
+
+async function generate() {
+  if (!audioReady) { showError("Enregistrez ou importez un fichier audio d'abord."); return; }
+
+  const nom = document.getElementById("nom_projet").value.trim();
+  const ctx = document.getElementById("contexte").value.trim();
+
+  hideError();
+  document.getElementById("saveNotif").classList.add("hidden");
+  rawText = "";
+  document.getElementById("rawOutput").textContent = "";
+  document.getElementById("renderedOutput").innerHTML = "";
+  document.getElementById("renderedOutput").classList.add("hidden");
+  document.getElementById("rawOutput").classList.remove("hidden");
+  showingRaw = true;
+  document.getElementById("rawToggle").textContent = "Rendu";
+  document.getElementById("outputCard").classList.remove("hidden");
+  document.getElementById("progressSection").classList.remove("hidden");
+  setStep(1,"pending"); setStep(2,"pending"); setStep(3,"pending");
+
+  const btn = document.getElementById("generateBtn");
+  btn.disabled = true;
+  btn.innerHTML = spinSVG() + "Génération en cours…";
+
+  if (activeESS) activeESS.close();
+  activeESS = new EventSource(`/generate?nom_projet=${encodeURIComponent(nom)}&contexte=${encodeURIComponent(ctx)}`);
+
+  activeESS.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.type === "status") {
+      if (d.step === 1) setStep(1, "active", d.message);
+      else if (d.step === 2) { setStep(1,"done",d.message); }
+      else if (d.step === 3) { setStep(1,"done"); setStep(2,"active",d.message); }
+    }
+    if (d.type === "token") {
+      rawText += d.text;
+      const el = document.getElementById("rawOutput");
+      el.textContent = rawText; el.scrollTop = el.scrollHeight;
+    }
+    if (d.type === "done") {
+      activeESS.close(); activeESS = null;
+      savedFilePath = d.file;
+      document.getElementById("renderedOutput").innerHTML = marked.parse(rawText);
+      document.getElementById("saveFilePath").textContent = d.file;
+      document.getElementById("saveNotif").classList.remove("hidden");
+      document.getElementById("saveNotif").scrollIntoView({ behavior:"smooth", block:"nearest" });
+      setStep(1,"done"); setStep(2,"done"); setStep(3,"done","Sauvegardé");
+      btn.disabled = false;
+      btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Nouveau compte-rendu`;
+    }
+    if (d.type === "error") {
+      activeESS.close(); activeESS = null;
+      showError(d.message);
+      btn.disabled = false;
+      btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Réessayer`;
+    }
+  };
+
+  setTimeout(() => document.getElementById("outputCard").scrollIntoView({ behavior:"smooth", block:"nearest" }), 100);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+async function copyToClipboard() {
+  try { await navigator.clipboard.writeText(rawText); }
+  catch { const el=document.createElement("textarea"); el.value=rawText; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el); }
+}
+
+function toggleView() {
+  showingRaw = !showingRaw;
+  document.getElementById("rawOutput").classList.toggle("hidden", !showingRaw);
+  document.getElementById("renderedOutput").classList.toggle("hidden", showingRaw);
+  document.getElementById("rawToggle").textContent = showingRaw ? "Rendu" : "Brut";
+}
+
+async function openSavedFile() {
+  if (savedFilePath) await fetch(`/open-file?path=${encodeURIComponent(savedFilePath)}`);
+}
+
+function showError(msg) {
+  document.getElementById("errorMessage").textContent = msg;
+  document.getElementById("errorNotif").classList.remove("hidden");
+  document.getElementById("errorNotif").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+function hideError() { document.getElementById("errorNotif").classList.add("hidden"); }
+
+function spinSVG() {
+  return `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+}
+</script>
+</body>
+</html>
