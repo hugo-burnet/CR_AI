@@ -83,6 +83,9 @@ if errorlevel 1 (
     pause & exit /b 1
 )
 
+REM ---- Supprimer le dossier build intermediaire (evite confusion avec dist) ----
+if exist build rmdir /s /q build
+
 echo.
 echo  =========================================
 echo   Build termine !
